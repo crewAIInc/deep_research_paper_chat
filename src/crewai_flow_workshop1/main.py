@@ -7,8 +7,8 @@ from datetime import datetime
 from crewai import LLM, Agent
 import json
 
-from crewai_flow_workshop1.tools.deep_research_paper import DeepResearchPaper # Using the local tool
-# from deep_research_paper_tool.tool import DeepResearchPaper # Importing tool from crewai tool repository
+# from crewai_flow_workshop1.tools.deep_research_paper import DeepResearchPaper # Using the local tool
+from deep_research_paper_tool.tool import DeepResearchPaper # Importing tool from crewai tool repository
 
 class Message(BaseModel):
     role: Literal["user", "assistant"] = "user" 

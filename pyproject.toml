@@ -7,6 +7,7 @@ requires-python = ">=3.10,<3.14"
 dependencies = [
     "colorama>=0.4.6",
     "crewai[tools]>=0.175.0,<1.0.0",
+    "deep-research-paper-tool>=0.1.2",
     "requests>=2.32.5",
 ]
 
@@ -19,5 +20,12 @@ plot = "crewai_flow_workshop1.main:plot"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[[tool.uv.index]]
+name = "116462-1c257d3e"
+url = "https://app.crewai.com/pypi/116462-1c257d3e"
+
 [tool.crewai]
 type = "flow"
+
+[tool.uv.sources]
+deep-research-paper-tool = { index = "116462-1c257d3e" }

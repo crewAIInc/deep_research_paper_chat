@@ -1,29 +1,37 @@
 #!/usr/bin/env python
 
-from crewai.flow import Flow, listen, start, router, persist
-from pydantic import BaseModel, Field
-from typing import Literal, List, Optional
-from datetime import datetime
-from crewai import LLM, Agent
 import json
+from datetime import datetime
+from typing import List, Literal, Optional
 
-# from crewai_flow_workshop1.tools.deep_research_paper import DeepResearchPaper # Using the local tool
-from deep_research_paper_tool.tool import DeepResearchPaper # Importing tool from crewai tool repository
+from crewai import LLM, Agent
+from crewai.flow import Flow, listen, persist, router, start
+from pydantic import BaseModel, Field
+
+from crewai_flow_workshop1.tools.deep_research_paper import (
+    DeepResearchPaper,  # Using the local tool
+)
+
+# from deep_research_paper_tool.tool import DeepResearchPaper # Importing tool from crewai tool repository
+
 
 class Message(BaseModel):
-    role: Literal["user", "assistant"] = "user" 
+    role: Literal["user", "assistant"] = "user"
     content: str
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
 
 class RouterIntent(BaseModel):
     user_intent: Literal["research", "conversation"]
     research_query: Optional[str] = None
     reasoning: str
 
+
 class Source(BaseModel):
     url: str
     title: str
     relevant_content: str
+
 
 class SearchResult(BaseModel):
     research_summary: str = Field(
@@ -35,6 +43,7 @@ class SearchResult(BaseModel):
         description="Complete list of all sources used in the research summary for reference."
     )
 
+
 class FlowState(BaseModel):
     user_message: str = "help me researching on the latest trends in ai"
     message_history: List[Message] = []
@@ -42,14 +51,13 @@ class FlowState(BaseModel):
     user_intent: Optional[Literal["research", "conversation"]] = None
     search_result: Optional[SearchResult] = None
 
+
 @persist()
 class DeepResearchFlow(Flow[FlowState]):
-
     def add_message(self, role: str, content: str):
         """Add a message to the message history"""
         new_message = Message(role=role, content=content)
         self.state.message_history.append(new_message)
-
 
     @start()
     def starting_flow(self):
@@ -59,14 +67,9 @@ class DeepResearchFlow(Flow[FlowState]):
 
         return self.state.user_message
 
-
-
     @router(starting_flow)
     def routing_intent(self):
-
-        llm = LLM(model="gpt-4.1-mini", 
-            temperature=0.1,
-            response_format=RouterIntent)
+        llm = LLM(model="gpt-4.1-mini", temperature=0.1, response_format=RouterIntent)
 
         prompt = f"""
         === TASK ===
@@ -96,7 +99,7 @@ class DeepResearchFlow(Flow[FlowState]):
 
         === OUTPUT REQUIREMENTS ===
         1. **user_intent**: Must be either "research" or "conversation"
-        2. **research_query**: 
+        2. **research_query**:
         - If intent is "research": Generate a comprehensive, specific research query that incorporates context from conversation history and current message
         - If intent is "conversation": Set to null
         3. **reasoning**: Provide clear reasoning for your classification decision
@@ -123,18 +126,14 @@ class DeepResearchFlow(Flow[FlowState]):
 
         response = llm.call(prompt)
 
-        print(f"Router Decision: {response}")
+        self.state.research_query = response.research_query
+        self.state.user_intent = response.user_intent
 
-        if isinstance(response, str):
-            response_data = json.loads(response)
-            self.state.research_query = response_data.get("research_query")
-            self.state.user_intent = response_data.get("user_intent")
-            return response_data.get("user_intent")
+        return response.user_intent
 
     @listen("conversation")
     def follow_up_conversation(self):
-
-        llm = LLM(model="gpt-4.1-mini", temperature=0.7)
+        llm = LLM(model="gpt-4.1-mini", temperature=0.2)
 
         prompt = f"""
         === ROLE ===
@@ -160,7 +159,7 @@ class DeepResearchFlow(Flow[FlowState]):
         === GUIDANCE OPPORTUNITIES ===
         When appropriate, you may suggest research on:
         - Scientific papers and studies
-        - Market trends and analysis  
+        - Market trends and analysis
         - Technical deep-dives
         - Data-driven insights
         - Current events and developments
@@ -175,17 +174,17 @@ class DeepResearchFlow(Flow[FlowState]):
         Respond to the user's message now:"""
 
         response = llm.call(prompt)
-        
+
         # Add the conversation response to history
         self.add_message("assistant", response)
-        
+
         print(f"Conversation response: {response}")
         return response
 
     @listen("research")
     def handle_research(self):
         print(f"Starting research with query: {self.state.research_query}")
-        
+
         # Create an Agent for deep research
         analyst = Agent(
             role="Deep Research Specialist",
@@ -196,29 +195,29 @@ class DeepResearchFlow(Flow[FlowState]):
             tools=[DeepResearchPaper()],
             verbose=True,
         )
-        
+
         # Execute the research
         task = f"""
         You must research and provide comprehensive information about the query:{self.state.research_query}
-        
+
         OUTPUT FORMAT REQUIREMENTS:
         - Write a comprehensive summary that combines ALL found sources into a single, cohesive narrative
         - Each piece of information MUST be immediately followed by its source URL in parentheses: (https://example.com/source)
         - sources_list: Include ALL sources used, with url, title, and relevant_content for each. Every fact, finding, or piece of information must be cited with its URL.
-        
+
         <example>
         Example:
         "According to recent research, AI adoption is increasing rapidly (https://example.com/source1), while challenges remain in implementation (https://example.com/source2)."
         </example>
         """
-    
+
         research_result = analyst.kickoff(task, response_format=SearchResult)
 
         self.state.search_result = research_result.pydantic
 
         # Add the research result to conversation history
         self.add_message("assistant", self.state.search_result.research_summary)
-        
+
         return self.state.model_dump()
 
 

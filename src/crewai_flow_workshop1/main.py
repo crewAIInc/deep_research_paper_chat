@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-
-import json
 from datetime import datetime
 from typing import List, Literal, Optional
 
@@ -192,9 +190,21 @@ class DeepResearchFlow(Flow[FlowState]):
             backstory="You are an expert researcher with access to academic databases and research sources. "
             "You excel at finding relevant scholarly papers, studies, and research findings, "
             "synthesizing multiple academic sources, and providing comprehensive insights from credible research.",
-            tools=[DeepResearchPaper()],
+            tools=[DeepResearchPaper(query="This is a good day")],
             verbose=True,
         )
+
+        # Create an Agent for deep research
+        analyst = Agent(
+            role="Deep Research Specialist",
+            goal="Conduct comprehensive research on specific queries, returning a summary response and detailed sources data",
+            backstory="You are an expert researcher with access to academic databases and research sources. "
+            "You excel at finding relevant scholarly papers, studies, and research findings, "
+            "synthesizing multiple academic sources, and providing comprehensive insights from credible research.",
+            tools=[DeepResearchPaper(query="This is a bad day")],
+            verbose=True,
+        )
+
 
         # Execute the research
         task = f"""

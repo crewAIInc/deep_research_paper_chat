@@ -1,17 +1,68 @@
-research_task:
+job_market_research_task:
   description: >
-    Conduct a thorough research about {topic}
-    Make sure you find any interesting and relevant information given
-    the current year is {current_year}.
-  expected_output: >
-    A list with 10 bullet points of the most relevant information about {topic}
-  agent: researcher
+    Search the web for 3-5 real job postings for {job_role} positions in or
+    near {location}. For each posting found, extract:
+    - Required skills and qualifications
+    - Preferred/nice-to-have skills
+    - Years of experience typically required
+    - Salary range (if available)
+    - Common responsibilities and duties
 
-reporting_task:
-  description: >
-    Review the context you got and expand each topic into a full section for a report.
-    Make sure the report is detailed and contains any and all relevant information.
+    Synthesize your findings into a summary of market expectations for this role.
   expected_output: >
-    A fully fledged report with the main topics, each with a full section of information.
-    Formatted as markdown without '```'
-  agent: reporting_analyst
+    A structured market research report containing:
+    1. Links to real job postings found
+    2. Common required skills across postings
+    3. Common preferred skills
+    4. Typical experience requirements
+    5. Salary range data (if found)
+    6. Key responsibilities patterns
+  agent: job_market_researcher
+
+ai_skills_research_task:
+  description: >
+    Research AI tools, technologies, and competencies that are specifically
+    relevant to {job_role} professionals. This applies to ALL types of roles,
+    not just tech positions. For example:
+    - A marketing manager should know AI content tools, analytics platforms
+    - A data engineer should know AI/ML pipelines, LLM frameworks
+    - An accountant should know AI-powered audit tools, automation platforms
+
+    Find specific tool names, certifications, and competencies that are
+    trending for this role in the current job market.
+  expected_output: >
+    A structured AI skills report containing:
+    1. Specific AI tools relevant to {job_role} (with tool names)
+    2. AI-related certifications or training that add value
+    3. AI competencies employers are looking for in this role
+    4. How AI is transforming the {job_role} profession
+  agent: ai_skills_researcher
+
+job_posting_creation_task:
+  description: >
+    First, research {company_name} to understand its:
+    - Mission and values
+    - Company culture and work environment
+    - Industry and market position
+    - Any notable benefits or perks
+
+    Then, using the market research and AI skills research provided as context,
+    create a complete, professional job posting in markdown format for a
+    {job_role} position at {company_name} in {location}.
+
+    The job posting must include ALL of the following sections:
+    - Job Title
+    - Company Overview (based on your research of {company_name})
+    - About the Role
+    - Key Responsibilities
+    - Required Qualifications
+    - Preferred Qualifications (including relevant AI skills)
+    - What We Offer / Benefits
+    - Location & Work Arrangement
+    - How to Apply
+  expected_output: >
+    A complete, polished job posting in markdown format that is ready to be
+    published. It should be professional, compelling, and incorporate insights
+    from the market research, AI skills analysis, and company research.
+    The posting should feel authentic to {company_name}'s brand and culture.
+  agent: job_posting_writer

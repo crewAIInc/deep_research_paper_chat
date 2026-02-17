@@ -2,15 +2,12 @@
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from crewai import LLM, Agent
+from crewai import Agent, LLM
 from crewai.flow import Flow, listen, persist, router, start
 from pydantic import BaseModel, Field
+from crewai_tools import FirecrawlSearchTool
 
-from crewai_flow_workshop1.tools.deep_research_paper import (
-    DeepResearchPaper,  # Using the local tool
-)
-
-# from deep_research_paper_tool.tool import DeepResearchPaper # Importing tool from crewai tool repository
+from crewai_flow_workshop1.crews.hr_crew.hr_crew import HrCrew
 
 
 class Message(BaseModel):
@@ -20,38 +17,26 @@ class Message(BaseModel):
 
 
 class RouterIntent(BaseModel):
-    user_intent: Literal["research", "conversation"]
-    research_query: Optional[str] = None
+    user_intent: Literal["job_creation", "conversation", "refinement"]
+    job_role: Optional[str] = None
+    location: Optional[str] = None
+    company_name: Optional[str] = None
+    feedback: Optional[str] = None
     reasoning: str
 
 
-class Source(BaseModel):
-    url: str
-    title: str
-    relevant_content: str
-
-
-class SearchResult(BaseModel):
-    research_summary: str = Field(
-        description="A comprehensive research summary that combines all found sources with inline URL citations. "
-        "Each piece of information must be followed by its source URL in parentheses format: (URL). "
-        "The summary should be organized by topics/themes and present a cohesive narrative."
-    )
-    sources_list: List[Source] = Field(
-        description="Complete list of all sources used in the research summary for reference."
-    )
-
-
 class FlowState(BaseModel):
-    user_message: str = "help me researching on the latest trends in ai"
+    user_message: str = "HI, create a job posting for a data engineer based in NYC for Johnson & Johnson"
     message_history: List[Message] = []
-    research_query: Optional[str] = None
-    user_intent: Optional[Literal["research", "conversation"]] = None
-    search_result: Optional[SearchResult] = None
+    job_role: Optional[str] = None
+    location: Optional[str] = None
+    company_name: Optional[str] = None
+    job_posting: Optional[str] = None
+    feedback: Optional[str] = None
 
 
 @persist()
-class DeepResearchFlow(Flow[FlowState]):
+class HrJobCreationFlow(Flow[FlowState]):
     def add_message(self, role: str, content: str):
         """Add a message to the message history"""
         new_message = Message(role=role, content=content)
@@ -59,119 +44,151 @@ class DeepResearchFlow(Flow[FlowState]):
 
     @start()
     def starting_flow(self):
-        # Add the user message to history
         if self.state.user_message:
             self.add_message("user", self.state.user_message)
-
         return self.state.user_message
 
     @router(starting_flow)
     def routing_intent(self):
-        llm = LLM(model="gpt-4.1-mini", temperature=0.1, response_format=RouterIntent)
+        llm = LLM(model="gpt-4.1-nano", response_format=RouterIntent)
+
+        has_posting = self.state.job_posting is not None
 
         prompt = f"""
         === TASK ===
-        You are an intelligent router that determines user intent and generates research queries when appropriate.
+        You are an intelligent router for an HR job creation assistant. Your job is to analyze
+        the user's message and conversation history to extract job creation details and determine intent.
 
         === INSTRUCTIONS ===
-        Analyze the user's message and conversation history to determine the intent. Follow these specific rules:
+        Extract any of these fields mentioned in the current message or conversation history:
+        - **job_role**: The job title/role being created (e.g., "Software Engineer", "Marketing Manager")
+        - **location**: The job location (e.g., "New York", "Remote", "London")
+        - **company_name**: The company the job is for (e.g., "Google", "Acme Corp")
 
-        **RESEARCH Intent Criteria:**
-        - User asks for factual information, studies, or analysis that requires external research
-        - User asks follow-up questions about previous research topics mentioned in conversation history
-        - User requests investigation into scientific papers, market trends, or data analysis
-        - User wants in-depth exploration of complex topics that benefit from comprehensive research
+        **ALREADY COLLECTED VALUES (preserve these — do NOT set to null):**
+        - job_role: {self.state.job_role or "Not yet collected"}
+        - location: {self.state.location or "Not yet collected"}
+        - company_name: {self.state.company_name or "Not yet collected"}
 
-        **CONVERSATION Intent Criteria:**
-        - General greetings, casual conversation, or personal questions
-        - Simple clarifications that don't require external research
-        - Requests for explanations about the system's capabilities
-        - Any interaction that is purely conversational in nature
+        **EXISTING JOB POSTING:** {"Yes — a posting has already been generated" if has_posting else "No posting yet"}
+
+        **ROUTING RULES:**
+        - Return "refinement" if a job posting ALREADY EXISTS and the user is giving feedback,
+          requesting changes, or asking for improvements to the current posting.
+          Also extract the **feedback** field: a concise summary of what the user wants changed.
+        - Return "job_creation" if ALL THREE fields (job_role, location, company_name) are populated
+          AND no job posting exists yet.
+          Also return "job_creation" if the user wants a completely NEW posting for a different
+          role/company (even if a posting exists — this resets state).
+        - Return "conversation" if any field is still missing and no posting exists yet.
 
         === INPUT DATA ===
         **Current User Message:**
         {self.state.user_message}
 
-        **Recent Conversation History:**
+        **Conversation History:**
         {self.state.message_history}
 
         === OUTPUT REQUIREMENTS ===
-        1. **user_intent**: Must be either "research" or "conversation"
-        2. **research_query**:
-        - If intent is "research": Generate a comprehensive, specific research query that incorporates context from conversation history and current message
-        - If intent is "conversation": Set to null
-        3. **reasoning**: Provide clear reasoning for your classification decision
-
-        === EXAMPLES ===
-        **Research Example:**
-        User: "What are the latest studies on climate change impacts?"
-        → user_intent: "research", research_query: "latest scientific studies climate change environmental impacts 2024", reasoning: "User requests current research information requiring external sources"
-
-        **Conversation Example:**
-        User: "Hello, how are you today?"
-        → user_intent: "conversation", research_query: null, reasoning: "General greeting requiring conversational response, no research needed"
-
-        **Follow-up Research Example:**
-        Previous context: Discussion about AI ethics
-        User: "Can you find more studies about bias in machine learning?"
-        → user_intent: "research", research_query: "bias machine learning algorithms studies fairness AI ethics research", reasoning: "Follow-up question on previous AI ethics discussion requiring additional research"
-
-        === CRITICAL REQUIREMENTS ===
-        - Be decisive and clear in your classification
-        - For research queries, make them specific and actionable for a research agent
-        - Consider conversation context when generating research queries
-        - Always provide reasoning for your decision"""
+        1. **user_intent**: "job_creation", "conversation", or "refinement"
+        2. **job_role**: The job role if mentioned (or from already collected values)
+        3. **location**: The location if mentioned (or from already collected values)
+        4. **company_name**: The company name if mentioned (or from already collected values)
+        5. **feedback**: If intent is "refinement", a concise summary of the requested changes. Otherwise null.
+        6. **reasoning**: Brief explanation of your decision
+        """
 
         response = llm.call(prompt)
 
-        self.state.research_query = response.research_query
-        self.state.user_intent = response.user_intent
+        # Accumulate state — only update fields that are newly extracted (don't overwrite with None)
+        if response.job_role:
+            self.state.job_role = response.job_role
+        if response.location:
+            self.state.location = response.location
+        if response.company_name:
+            self.state.company_name = response.company_name
+        if response.feedback:
+            self.state.feedback = response.feedback
 
         return response.user_intent
 
     @listen("conversation")
     def follow_up_conversation(self):
-        llm = LLM(model="gpt-4.1-mini", temperature=0.2)
+        llm = LLM(model="gpt-5-nano")
+
+        collected = []
+        missing = []
+
+        if self.state.job_role:
+            collected.append(f"Job Role: {self.state.job_role}")
+        else:
+            missing.append("job role")
+
+        if self.state.location:
+            collected.append(f"Location: {self.state.location}")
+        else:
+            missing.append("location")
+
+        if self.state.company_name:
+            collected.append(f"Company: {self.state.company_name}")
+        else:
+            missing.append("company name")
+
+        collected_str = ", ".join(collected) if collected else "Nothing yet"
+        missing_str = ", ".join(missing)
 
         prompt = f"""
         === ROLE ===
-        You are a helpful and knowledgeable conversation assistant specialized in guiding users toward valuable research opportunities when appropriate.
-
-        === TASK ===
-        Provide a natural, helpful response to the user's message while being mindful of conversation flow and context.
+        You are a friendly HR assistant helping users create job postings. Your goal is to
+        collect three pieces of information: job role, location, and company name.
 
         === CONTEXT ===
         **Current User Message:**
         {self.state.user_message}
 
-        **Recent Conversation History:**
+        **Conversation History:**
         {self.state.message_history}
 
+        **Already Collected:**
+        {collected_str}
+
+        **Still Needed:**
+        {missing_str}
+
         === INSTRUCTIONS ===
-        1. **Respond naturally**: Address the user's message directly and conversationally
-        2. **Be helpful**: Provide useful information or assistance based on their request
-        3. **Guide appropriately**: If the conversation naturally leads toward topics that would benefit from research, gently suggest research options
-        4. **Maintain context**: Reference previous conversation points when relevant
-        5. **Stay engaging**: Keep the conversation flowing and be personable
+        1. Respond naturally to the user's message
+        2. Acknowledge any information they've already provided
+        3. Ask for the missing information in a conversational way
+        4. Be warm, professional, and concise
+        5. If the user hasn't mentioned anything about job creation yet, introduce yourself and
+           explain that you can help create job postings
 
-        === GUIDANCE OPPORTUNITIES ===
-        When appropriate, you may suggest research on:
-        - Scientific papers and studies
-        - Market trends and analysis
-        - Technical deep-dives
-        - Data-driven insights
-        - Current events and developments
-
-        === RESPONSE STYLE ===
-        - Be conversational and natural
-        - Show understanding of the user's needs
-        - Provide actionable next steps when relevant
-        - Keep responses concise but comprehensive
-        - Be encouraging and supportive
-
-        Respond to the user's message now:"""
+        Respond to the user now:"""
 
         response = llm.call(prompt)
+
+        self.add_message("assistant", response)
+        print(f"Assistant: {response}")
+        return response
+
+    @listen("job_creation")
+    def handle_job_creation(self):
+        print(
+            f"\nCreating job posting for: {self.state.job_role} "
+            f"at {self.state.company_name} in {self.state.location}\n"
+        )
+
+        crew = HrCrew().crew()
+        result = crew.kickoff(
+            inputs={
+                "job_role": self.state.job_role,
+                "location": self.state.location,
+                "company_name": self.state.company_name,
+            }
+        )
+
+        response = result.raw
+        self.state.job_posting = response
 
         # Add the conversation response to history
         self.add_message("assistant", response)
@@ -179,66 +196,61 @@ class DeepResearchFlow(Flow[FlowState]):
         print(f"Conversation response: {response}")
         return response
 
-    @listen("research")
-    def handle_research(self):
-        print(f"Starting research with query: {self.state.research_query}")
+    @listen("refinement")
+    def handle_refinement(self):
+        print(f"\nRefining job posting based on feedback: {self.state.feedback}\n")
 
-        # Create an Agent for deep research
-        analyst = Agent(
-            role="Deep Research Specialist",
-            goal="Conduct comprehensive research on specific queries, returning a summary response and detailed sources data",
-            backstory="You are an expert researcher with access to academic databases and research sources. "
-            "You excel at finding relevant scholarly papers, studies, and research findings, "
-            "synthesizing multiple academic sources, and providing comprehensive insights from credible research.",
-            tools=[DeepResearchPaper(query="This is a good day")],
+        llm = LLM(model="gpt-5-nano", temperature=0.3)
+
+        agent = Agent(
+            role="Senior Job Posting Editor",
+            goal="Refine and improve job postings based on specific feedback",
+            backstory=(
+                "You are an expert HR editor who specializes in polishing "
+                "and refining job postings. You make precise, targeted changes "
+                "based on feedback while preserving the overall quality and "
+                "structure of the posting."
+            ),
+            tools=[FirecrawlSearchTool()],
+            llm=llm,
             verbose=True,
         )
 
-        # Create an Agent for deep research
-        analyst = Agent(
-            role="Deep Research Specialist",
-            goal="Conduct comprehensive research on specific queries, returning a summary response and detailed sources data",
-            backstory="You are an expert researcher with access to academic databases and research sources. "
-            "You excel at finding relevant scholarly papers, studies, and research findings, "
-            "synthesizing multiple academic sources, and providing comprehensive insights from credible research.",
-            tools=[DeepResearchPaper(query="This is a bad day")],
-            verbose=True,
-        )
+        prompt = f"""
+        You have a job posting that needs refinement based on user feedback.
 
+        === CURRENT JOB POSTING ===
+        {self.state.job_posting}
 
-        # Execute the research
-        task = f"""
-        You must research and provide comprehensive information about the query:{self.state.research_query}
+        === USER FEEDBACK ===
+        {self.state.feedback}
 
-        OUTPUT FORMAT REQUIREMENTS:
-        - Write a comprehensive summary that combines ALL found sources into a single, cohesive narrative
-        - Each piece of information MUST be immediately followed by its source URL in parentheses: (https://example.com/source)
-        - sources_list: Include ALL sources used, with url, title, and relevant_content for each. Every fact, finding, or piece of information must be cited with its URL.
-
-        <example>
-        Example:
-        "According to recent research, AI adoption is increasing rapidly (https://example.com/source1), while challenges remain in implementation (https://example.com/source2)."
-        </example>
+        === INSTRUCTIONS ===
+        - Make ONLY the changes requested in the feedback
+        - Preserve the overall structure and quality of the posting
+        - Keep all sections that aren't affected by the feedback
+        - Return the complete updated job posting in markdown format
         """
 
-        research_result = analyst.kickoff(task, response_format=SearchResult)
+        result = agent.kickoff(prompt)
+        response = result.raw
+        self.state.job_posting = response
 
-        self.state.search_result = research_result.pydantic
+        # Add the conversation response to history
+        self.add_message("assistant", response)
 
-        # Add the research result to conversation history
-        self.add_message("assistant", self.state.search_result.research_summary)
-
-        return self.state.model_dump()
+        print(f"Conversation response: {response}")
+        return response
 
 
 def kickoff():
-    research_flow = DeepResearchFlow(tracing=True)
-    research_flow.kickoff()
+    hr_flow = HrJobCreationFlow(tracing=True)
+    hr_flow.kickoff()
 
 
 def plot():
-    research_flow = DeepResearchFlow()
-    research_flow.plot()
+    hr_flow = HrJobCreationFlow()
+    hr_flow.plot()
 
 
 if __name__ == "__main__":

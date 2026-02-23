@@ -1,23 +1,32 @@
 """CrewAI AMP API client — kickoff and poll for Deep Research responses."""
 
 import json
+import os
 
 import requests
 import streamlit as st
 
 
+def _get_secret(key: str) -> str | None:
+    """Read a secret from st.secrets (local) or os.environ (Heroku)."""
+    try:
+        return st.secrets[key]
+    except (KeyError, FileNotFoundError):
+        return os.environ.get(key)
+
+
 def _api_url() -> str:
-    url = st.secrets.get("CRW_API_URL")
+    url = _get_secret("CRW_API_URL")
     if not url:
-        st.error("CRW_API_URL is not configured. Check your Streamlit secrets or Heroku config vars.")
+        st.error("CRW_API_URL is not configured. Set it in .streamlit/secrets.toml or as an environment variable.")
         st.stop()
     return url.rstrip("/")
 
 
 def _headers() -> dict:
-    token = st.secrets.get("CRW_API_TOKEN")
+    token = _get_secret("CRW_API_TOKEN")
     if not token:
-        st.error("CRW_API_TOKEN is not configured. Check your Streamlit secrets or Heroku config vars.")
+        st.error("CRW_API_TOKEN is not configured. Set it in .streamlit/secrets.toml or as an environment variable.")
         st.stop()
     return {
         "Authorization": f"Bearer {token}",

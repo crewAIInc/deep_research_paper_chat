@@ -1,7 +1,7 @@
 [project]
-name = "crewai_flow_workshop1"
+name = "deep_research_agent"
 version = "0.1.0"
-description = "crewai_flow_workshop1 using crewAI"
+description = "Deep research agent using crewAI"
 authors = [{ name = "Your Name", email = "you@example.com" }]
 requires-python = ">=3.10,<3.14"
 dependencies = [
@@ -17,9 +17,9 @@ dependencies = [
 allow-direct-references = true
 
 [project.scripts]
-kickoff = "crewai_flow_workshop1.main:kickoff"
-run_crew = "crewai_flow_workshop1.main:kickoff"
-plot = "crewai_flow_workshop1.main:plot"
+kickoff = "deep_research_agent.main:kickoff"
+run_crew = "deep_research_agent.main:kickoff"
+plot = "deep_research_agent.main:plot"
 
 [build-system]
 requires = ["hatchling"]

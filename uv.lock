@@ -521,27 +521,6 @@ tools = [
 ]
 
 [[package]]
-name = "crewai-flow-workshop1"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "colorama" },
-    { name = "crewai", extra = ["tools"] },
-    { name = "firecrawl-py" },
-    { name = "mcp" },
-    { name = "requests" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "colorama", specifier = ">=0.4.6" },
-    { name = "crewai", extras = ["tools"], git = "https://github.com/crewAIInc/crewAI.git?subdirectory=lib%2Fcrewai&rev=main" },
-    { name = "firecrawl-py", specifier = ">=4.15.0" },
-    { name = "mcp", specifier = ">=1.23.3" },
-    { name = "requests", specifier = ">=2.32.5" },
-]
-
-[[package]]
 name = "crewai-tools"
 version = "1.9.3"
 source = { git = "https://github.com/crewAIInc/crewAI.git?subdirectory=lib%2Fcrewai-tools&rev=main#51754899a2b3e35d94f225bef82cb2957cb1d2b3" }
@@ -612,6 +591,27 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/43/fa/6d96a0978d19e17b68d634497769987b16c8f4cd0a7a05048bec693caa6b/decorator-5.2.1.tar.gz", hash = "sha256:65f266143752f734b0a7cc83c46f4618af75b8c5911b00ccb61d0ac9b6da0360", size = 56711, upload-time = "2025-02-24T04:41:34.073Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4e/8c/f3147f5c4b73e7550fe5f9352eaa956ae838d5c51eb58e7a25b9f3e2643b/decorator-5.2.1-py3-none-any.whl", hash = "sha256:d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a", size = 9190, upload-time = "2025-02-24T04:41:32.565Z" },
+]
+
+[[package]]
+name = "deep-research-agent"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "colorama" },
+    { name = "crewai", extra = ["tools"] },
+    { name = "firecrawl-py" },
+    { name = "mcp" },
+    { name = "requests" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "colorama", specifier = ">=0.4.6" },
+    { name = "crewai", extras = ["tools"], git = "https://github.com/crewAIInc/crewAI.git?subdirectory=lib%2Fcrewai&rev=main" },
+    { name = "firecrawl-py", specifier = ">=4.15.0" },
+    { name = "mcp", specifier = ">=1.23.3" },
+    { name = "requests", specifier = ">=2.32.5" },
 ]
 
 [[package]]

@@ -24,7 +24,9 @@ class RouterOutput(BaseModel):
 
 
 class FlowState(BaseModel):
-    user_message: str = "Hey"
+    user_message: str = (
+        "Hey, do a deep research on the Agentic AI Framework in the market as of 2026"
+    )
     message_history: List[Message] = []
     search_queries: Optional[List[str]] = None
     chat_response: Optional[str] = None

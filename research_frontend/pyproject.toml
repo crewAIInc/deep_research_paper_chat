@@ -1,0 +1,10 @@
+[project]
+name = "research-frontend"
+version = "0.1.0"
+description = "Streamlit chat UI for the Deep Research CrewAI flow"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.32.5",
+    "streamlit>=1.54.0",
+]
